@@ -119,3 +119,116 @@ func (p *Player) Talk(context string) {
 		player.SendMsg(200, proto_msg)
 	}
 }
+
+//玩家上线，同步广播玩家位置消息
+func (p *Player) SyncSurrounding() {
+	//1.获取当前周围玩家（九宫格）
+	pids := WorldMgrObj.AoiMgr.GetPidsByPos(p.X, p.Z)
+	players := make([]*Player, 0, len(pids))
+	for _, pid := range pids {
+		player, ok := WorldMgrObj.Players[int32(pid)]
+		if ok {
+			players = append(players, player)
+		}
+	}
+
+	//2将当前玩家位置信息通过msgID:200 发往周围玩家
+	//2.1组件msgID:200 proto数据
+	proto_msg := &pb.BroadCast{
+		Pid: p.Pid,
+		Tp:  2, //代表广播坐标
+		Data: &pb.BroadCast_P{
+			P: &pb.Position{
+				X: p.X,
+				Y: p.Y,
+				Z: p.Z,
+				V: p.V,
+			},
+		},
+	}
+	//2.2向周围玩家发送消息
+	for _, player := range players {
+		player.SendMsg(200, proto_msg)
+	}
+
+	//3 获取周围玩家位置信息
+	//周围玩家信息切片
+	players_proto_msg := make([]*pb.Player, 0, len(players))
+	for _, player := range players {
+		p_msg := &pb.Player{
+			Pid: player.Pid,
+			P: &pb.Position{
+				X: player.X,
+				Y: player.Y,
+				Z: player.Z,
+				V: player.V,
+			},
+		}
+		players_proto_msg = append(players_proto_msg, p_msg)
+	}
+
+	//封装SyncPlayer protobuf数据
+	SyncPlayers_proto_msg := &pb.SyncPlayers{
+		Ps: players_proto_msg[:],
+	}
+
+	p.SendMsg(202, SyncPlayers_proto_msg)
+}
+
+func (p *Player) UpdataPos(x, y, z, v float32) {
+	p.X = x
+	p.Y = y
+	p.Z = z
+	p.V = v
+
+	//组建广播proto协议
+	proto_msg := &pb.BroadCast{
+		Pid: p.Pid,
+		Tp:  4, //移动后的坐标信息
+		Data: &pb.BroadCast_P{
+			P: &pb.Position{
+				X: p.X,
+				Y: p.Y,
+				Z: p.Z,
+				V: p.V,
+			}},
+	}
+
+	//获取当前玩家周边玩家AOI九宫格内的玩家
+	players := p.GetSuroundingPlayers()
+	for _, player := range players {
+		player.SendMsg(200, proto_msg)
+	}
+}
+
+func (p *Player) GetSuroundingPlayers() []*Player {
+	//得到当前AOI九宫格内所有玩家ID
+	pids := WorldMgrObj.AoiMgr.GetPidsByPos(p.X, p.Z)
+
+	players := make([]*Player, 0, len(pids))
+	for _, pid := range pids {
+		player, ok := WorldMgrObj.Players[int32(pid)]
+		if ok {
+			players = append(players, player)
+		}
+	}
+
+	return players
+}
+
+func (p *Player) Offline() {
+	//得到当前玩家周边九宫格玩家
+	players := p.GetSuroundingPlayers()
+
+	//封装消息
+	proto_msg := &pb.SyncPid{
+		Pid: p.Pid,
+	}
+
+	for _, player := range players {
+		player.SendMsg(201, proto_msg)
+	}
+
+	WorldMgrObj.AoiMgr.RemoveFromGridByPos(int(p.Pid), p.X, p.Z)
+	WorldMgrObj.RemovePlayerByPid(p.Pid)
+}

@@ -25,7 +25,20 @@ func onConnectionAdd(conn ziface.IConnection) {
 	conn.SetProperty("pid", player.Pid)
 
 	//同步周边玩家，告知新上线玩家位置信息
+	player.SyncSurrounding()
+
 	log.Println("====> Player pid=", &player.Pid, " is arrived<===")
+}
+
+func OnConnectionLost(conn ziface.IConnection) {
+	pid, _ := conn.GetProperty("pid")
+
+	player := core.WorldMgrObj.GetPlayerByPid(pid.(int32))
+
+	//触发玩家下线业务
+	player.Offline()
+
+	log.Println("=====> Player pid = ", pid, " offline...<==")
 }
 
 func main() {
@@ -34,9 +47,11 @@ func main() {
 
 	//链接创建和销毁的HOOK钩子函数
 	s.SetOnConnStart(onConnectionAdd)
+	s.SetOnConnStop(OnConnectionLost)
 
 	//注册路由
 	s.AddRouter(2, &apis.WorldChatApi{})
+	s.AddRouter(3, &apis.MoveApi{})
 
 	//启动服务
 	s.Serve()

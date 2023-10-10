@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"log"
 )
 
 // 定义一些AOI的边界值
@@ -141,7 +140,7 @@ func (m *AOIManager) GetPidsByPos(x, y float32) (playerIDs []int) {
 	//获取范围内所有玩家id
 	for _, v := range grids {
 		playerIDs = append(playerIDs, v.GetPlayerIDs()...)
-		log.Printf("==> grid ID:%d, pids: %v ====", v.GID, v.GetPlayerIDs())
+		//log.Printf("==> grid ID:%d, pids: %v ====", v.GID, v.GetPlayerIDs())
 	}
 	return
 }
